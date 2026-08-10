@@ -1,13 +1,16 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import plotly.express as px
 
 st.set_page_config(layout='wide',page_title='StartUp Analysis')  # print the name on the tab of streamlit
 
+# All the eiditing part performed on the dataset to improve the results
 df = pd.read_csv('startup_cleaned.csv')
 df['date'] = pd.to_datetime(df['date'],errors='coerce')
 df['month'] = df['date'].dt.month
 df['year'] = df['date'].dt.year
+df['city'].replace({'Bengaluru':'Bangalore','Gurgaon':'Gurugram','New Delhi':'Delhi'},inplace=True)
 
 def load_overall_analysis():
     st.title('Overall Analysis')
@@ -34,19 +37,173 @@ def load_overall_analysis():
     with col4:
         st.metric('Funded Startups',num_startups)
 
-    st.header('MoM graph')
+    st.header('MoM Graph')
     selected_option = st.selectbox('Select Type',['Total','Count'])
     if selected_option == 'Total':
-        temp_df = df.groupby(['year', 'month'])['amount'].sum().reset_index()
+        temp_df = df.groupby(['year','month'])['amount'].sum().reset_index()
     else:
-        temp_df = df.groupby(['year', 'month'])['amount'].count().reset_index()
+        temp_df = df.groupby(['year','month'])['amount'].count().reset_index()
 
-    temp_df['x_axis'] = temp_df['month'].astype('str') + '-' + temp_df['year'].astype('str')
+    #temp_df['x_axis'] = temp_df['year'].astype('str')
+    temp_df['x_axis'] = pd.to_datetime(temp_df[['year', 'month']].assign(day=20))
+    
 
-    fig3, ax3 = plt.subplots()
-    ax3.plot(temp_df['x_axis'], temp_df['amount'])
+    fig4, ax = plt.subplots(figsize=(12, 5))
 
-    st.pyplot(fig3)
+    ax.plot(
+        temp_df['x_axis'],
+        temp_df['amount']
+    )
+
+    ax.set_xlabel('Date')
+    ax.set_ylabel(
+        'Monthly Investment' if selected_option == 'Total'
+        else 'Number of Investments'
+    )
+    ax.grid(True, alpha=0.3)
+    fig4.autofmt_xdate()
+    st.pyplot(fig4)
+
+    # Adding the city wise funding analysis 
+    st.header('City wise')
+
+    
+    co1,co2=st.columns(2)
+
+    with co1:
+        st.subheader('City Wise Deals')
+        #city_wise_fund=df.groupby('city')['amount'].sum().sort_values(ascending=False).head(7)
+        city_wise_deals=df['city'].value_counts().head(7)
+        fig5, ax1 = plt.subplots()
+        ax1.pie(city_wise_deals,labels=city_wise_deals.index,autopct="%0.01f%%")
+        
+        st.pyplot(fig5)
+    with co2:
+        st.subheader('City Wise Amount Funded')
+        city_wise_fund=df.groupby('city')['amount'].sum().sort_values(ascending=False).head(7).astype('int64')
+        fig6, ax = plt.subplots()
+        ax.bar(city_wise_fund.index,city_wise_fund.values)
+        ax.grid(True, alpha=0.3)
+                
+        st.pyplot(fig6)
+
+    #top startups analysis
+
+    st.subheader('Top Startup')
+
+    top_startups = (
+    df.groupby(['year', 'startup'])['amount']
+    .sum()
+    .reset_index()
+    .sort_values(by=['year', 'amount'], ascending=False)
+    .drop_duplicates(subset=['year'])
+    .sort_values(by='year') ) # Sort chronologically for better plotting
+
+          #or it can be done using idxmax()
+
+           # Group by year and find the row index with the maximum amount for each year
+           #max_per_year_idx = df.groupby('year')['amount'].idxmax()
+           #max_per_year = df.loc[max_per_year_idx]
+           #max_per_year[['year', 'startup', 'amount']].sort_values(by='year', ascending=False)'''
+
+    st.subheader("Top Funded Startup Per Year")
+ 
+
+    st.dataframe(top_startups, use_container_width=True,hide_index=True)
+
+    fig7 = px.bar(
+    top_startups,
+    x='year',
+    y='amount',
+    hover_name='startup',
+    text='startup',
+    title='Top Funded Startup Per Year',
+    labels={'year': 'Year', 'amount': 'Amount'})
+
+    fig7.update_traces(textposition='outside')
+
+    st.plotly_chart(fig7, use_container_width=True)
+
+    # each startup's overall fundings 
+
+    total_fund=df.groupby('startup')['amount'].sum().sort_values(ascending=False).head(10)
+    fig8 = px.bar(
+        total_fund,
+        x=total_fund.index,
+        y=total_fund.values,
+        #hover_name='startup',
+        #text='startup',
+        title='Top Funded Startup',
+        )
+    
+    fig8.update_traces(text=total_fund.index,textposition='outside')
+
+    fig8.update_xaxes(showticklabels=False)
+    fig8.update_layout(
+    xaxis_title="Startups",
+    yaxis_title="Total Amount Raised"
+)
+    
+    st.plotly_chart(fig8, use_container_width=True)
+    
+
+    #Top investors 
+
+    top_investor=df.groupby('investors')['amount'].sum().sort_values(ascending=False).head(5)
+
+    fig9 = px.bar(
+            top_investor,
+            x=top_investor.index,
+            y=top_investor.values,
+            #hover_name='startup',
+            #text='startup',
+            title='Top Investros',
+            )
+        
+    fig9.update_traces(text=top_investor.index,textposition='outside')
+    
+    fig9.update_xaxes(showticklabels=False)
+    fig9.update_layout(
+        xaxis_title="Startups",
+        yaxis_title="Total Amount Raised"
+    )
+        
+    st.plotly_chart(fig9, use_container_width=False)
+
+    # Heatmap
+
+
+
+    # Create a pivot table
+    funding_pivot = df.pivot_table(
+        index='year', 
+        columns='month', 
+        values='amount', 
+        aggfunc='sum', 
+        fill_value=0
+    )
+
+    # Plot interactive heatmap
+    fig10 = px.imshow(
+        funding_pivot,
+        labels=dict(x="Month", y="Year", color="Total Amount"),
+        x=funding_pivot.columns,
+        y=funding_pivot.index,
+        color_continuous_scale='Viridis',
+        title="Funding Heatmap (Year vs Month)"
+    )
+
+    # Display in Streamlit:
+    # st.plotly_chart(fig, use_container_width=True)
+
+    # Display in Jupyter Notebook:
+    st.plotly_chart(fig10, use_container_width=True)
+
+        
+
+
+    # Till here have to figure out how to present the data of city wise funding 
+    
 
 
 
@@ -87,12 +244,20 @@ def load_investor_details(investor):
 
     with co3:
 
-        df['year'] = df['date'].dt.year
-        year_series = df[df['investors'].str.contains(investor)].groupby('year')['amount'].sum()
+        #df['year'] = df['date'].dt.year
+        
+        year = df[df['investors'].str.contains(investor)].groupby('year')['amount'].sum().reset_index()
+
+        year['x_axis'] = year['year'].astype('str')
 
         st.subheader('YoY Investment')
         fig2, ax2 = plt.subplots()
-        ax2.plot(year_series.index,year_series.values)
+        ax2.plot(year['x_axis'],year['amount'])
+
+        ax2.set_xlabel('Year')
+        ax2.set_ylabel(
+                'Total Investment'
+            )
 
         st.pyplot(fig2)
     with co4:
