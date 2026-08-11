@@ -215,8 +215,10 @@ def load_investor_details(investor):
     #sorting on the basis of date to get most recent investements
     last5_df=last5_df.sort_values(by='date',ascending=False)
     st.subheader('Most Recent Investments')
-    st.dataframe(last5_df.head())
+    st.dataframe(last5_df.head(),use_container_width=True,hide_index=True)
+
     st.metric('Generally invested vertical is',last5_df['vertical'].mode()[0])
+    
     # sector invested with most amounts
     st.subheader('Most Amount Invested Vertical')
     st.write(last5_df.groupby('vertical')['amount'].sum().sort_values(ascending=False).head())
