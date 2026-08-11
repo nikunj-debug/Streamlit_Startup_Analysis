@@ -10,8 +10,9 @@ df = pd.read_csv('startup_cleaned.csv')
 df['date'] = pd.to_datetime(df['date'],errors='coerce')
 df['month'] = df['date'].dt.month
 df['year'] = df['date'].dt.year
-df['city'].replace({'Bengaluru':'Bangalore','Gurgaon':'Gurugram','New Delhi':'Delhi'},inplace=True)
-
+df['city'] = df['city'].replace({'Bengaluru': 'Bangalore', 'Gurgaon': 'Gurugram', 'New Delhi': 'Delhi'})
+df['startup']=df['startup'].replace({'Flipkart.com':'Flipkart','Ola Cabs':'Ola','Olacabs':'Ola','Rapido Bike Taxi':'Rapido','Oyo Rooms':'OYO Rooms'})
+df['investors']=df['investors'].replace({'SoftBank Group':'Softbank'})
 def load_overall_analysis():
     st.title('Overall Analysis')
 
@@ -270,6 +271,52 @@ def load_investor_details(investor):
         
         st.pyplot(fig4)
 
+def load_startup(company):
+    st.title(company)
+    #st.subheader('Vertical of '+ company)
+    #st.write(df[df['startup']==company]['vertical'].values[0])
+
+    startup_data = df[df['startup'] == company].iloc[0]
+    
+    # Divide into columns for a key-value layout
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.caption("INDUSTRY VERTICAL")
+        st.subheader(f"🏷️ {startup_data['vertical']}")
+        
+    with col2:
+        st.caption("SUB-VERTICAL")
+        st.subheader(f"📌 {startup_data.get('subvertical', 'N/A')}")
+
+    with col3:
+        st.caption("LOCATION")
+        st.subheader(f"📍 {startup_data.get('city', 'N/A')}")
+        
+    st.divider() # Creates a clean horizontal line
+
+#funding rounds of startups
+    
+    rounds=df[df['startup']==company][['year','round','investors','amount']]
+
+    st.subheader('Funding Rounds')
+    st.dataframe(rounds, use_container_width=True,hide_index=True)
+
+    st.metric('Total Funding raised',rounds['amount'].sum())
+
+#similiar companies
+
+    similar_vertical=df[startup_data['subvertical']==df['subvertical']]
+
+    st.subheader('Similiar Companies')
+    st.dataframe(similar_vertical[['year','startup','vertical','investors','amount']],use_container_width=True,hide_index=True)
+
+
+
+
+    
+
+
 
 st.sidebar.title('Startup Funding Analysis')
 
@@ -279,9 +326,14 @@ if option == 'Overall Analysis':
     load_overall_analysis()
 
 elif option == 'StartUp':
-    st.sidebar.selectbox('Select StartUp',sorted(df['startup'].unique().tolist()))
-    btn1 = st.sidebar.button('Find StartUp Details')
     st.title('StartUp Analysis')
+
+    selected_startup = st.sidebar.selectbox('Select StartUp',sorted(df['startup'].unique().tolist()))
+   
+    btn1 = st.sidebar.button('Find StartUp Details')
+    if btn1:
+        load_startup(selected_startup)
+    
 else:
     selected_investor = st.sidebar.selectbox('Select StartUp',sorted(set(df['investors'].str.split(',').sum())))
     btn2 = st.sidebar.button('Find Investor Details')
